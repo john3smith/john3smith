@@ -1,0 +1,67 @@
+name: Repository security
+on:
+  push:
+    branches: ["master"]
+  pull_request:
+    branches: ["master"]
+  schedule:
+    - cron: "31 3 * * 1"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+jobs:
+  secret-scan:
+    name: Secret scan
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4; reviewed immutable commit
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Run secret scan
+        run: python3 .github/scripts/security_checks.py secrets
+  dependency-review:
+    name: Dependency review
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4; reviewed immutable commit
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Run dependency review
+        run: python3 .github/scripts/security_checks.py dependencies
+  source-validation:
+    name: Source validation
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4; reviewed immutable commit
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Run source validation
+        run: python3 .github/scripts/security_checks.py validate
+  full-audit:
+    name: Full security audit
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4; reviewed immutable commit
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Run full security audit
+        run: python3 .github/scripts/security_checks.py audit
